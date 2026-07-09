@@ -49,7 +49,13 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`✅ Backend MINEE démarré sur http://localhost:${PORT}`);
-  console.log(`   Test santé : http://localhost:${PORT}/api/health`);
-});
+
+// Ne démarre le serveur en écoute que hors environnement Vercel/production
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`✅ Backend MINEE démarré sur http://localhost:${PORT}`);
+    console.log(`   Test santé : http://localhost:${PORT}/api/health`);
+  });
+}
+
+module.exports = app;

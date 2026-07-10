@@ -11,7 +11,7 @@ const tachesRoutes = require('./routes/taches');
 const equipesRoutes = require('./routes/equipes');
 const rapportsRoutes = require('./routes/rapports');
 const inspectionsRoutes = require('./routes/inspections');
-const statsRoutes = require('./routes/stats'); const seedTempRoutes = require('./routes/seedTemp');
+const statsRoutes = require('./routes/stats'); 
 
 const app = express();
 
@@ -32,7 +32,7 @@ app.use('/api/projets', projetsRoutes);
 app.use('/api/taches', tachesRoutes);
 app.use('/api/equipes', equipesRoutes);
 app.use('/api/rapports', rapportsRoutes);
-app.use('/api/inspections', inspectionsRoutes);app.use('/api/seed-temp', seedTempRoutes);
+app.use('/api/inspections', inspectionsRoutes);
 app.use('/api/stats', statsRoutes);
 
 // Gestion des erreurs multer (taille de fichier, format, etc.)

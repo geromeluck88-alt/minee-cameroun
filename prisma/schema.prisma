@@ -1,0 +1,185 @@
+// backend/prisma/schema.prisma
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CHEF_PROJET
+  CHEF_EQUIPE
+  INSPECTEUR
+}
+
+enum StatutProjet {
+  EN_ATTENTE
+  EN_COURS
+  TERMINE
+  EN_RETARD
+  SUSPENDU
+}
+
+enum StatutTache {
+  A_FAIRE
+  EN_COURS
+  TERMINE
+  BLOQUE
+  EN_RETARD
+}
+
+enum StatutInspection {
+  EN_ATTENTE
+  EN_COURS
+  TERMINE
+}
+
+enum Priorite {
+  BASSE
+  NORMALE
+  HAUTE
+  URGENTE
+}
+
+model Utilisateur {
+  id            Int      @id @default(autoincrement())
+  nom           String
+  email         String   @unique
+  motDePasse    String
+  role          Role
+  telephone     String?
+  photo         String?
+  actif         Boolean  @default(true)
+  dateCreation  DateTime @default(now())
+
+  projetsDiriges     Projet[]       @relation("ChefProjet")
+  equipesDirigees    Equipe[]       @relation("ChefEquipe")
+  tachesAssignees    Tache[]        @relation("AssigneA")
+  membreEquipes      MembreEquipe[]
+  rapports           Rapport[]      @relation("ChefEquipeRapport")
+  inspections        Inspection[]   @relation("Inspecteur")
+
+  @@map("utilisateurs")
+}
+
+model Projet {
+  id           Int          @id @default(autoincrement())
+  nom          String
+  description  String?      @db.Text
+  dateDebut    DateTime
+  dateFin      DateTime
+  statut       StatutProjet @default(EN_ATTENTE)
+  priorite     Priorite     @default(NORMALE)
+  budget       Float?
+  chefProjetId Int
+
+  chefProjet   Utilisateur   @relation("ChefProjet", fields: [chefProjetId], references: [id])
+  taches       Tache[]
+  equipes      Equipe[]
+  inspections  Inspection[]
+
+  @@map("projets")
+}
+
+model Tache {
+  id            Int         @id @default(autoincrement())
+  titre         String
+  description   String?     @db.Text
+  dateDebut     DateTime
+  dateFinPrevue DateTime
+  statut        StatutTache @default(A_FAIRE)
+  priorite      Priorite    @default(NORMALE)
+  avancement    Int         @default(0)
+  projetId      Int
+  assigneAId    Int?
+
+  projet    Projet        @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  assigneA  Utilisateur?  @relation("AssigneA", fields: [assigneAId], references: [id])
+  rapports  Rapport[]
+
+  @@map("taches")
+}
+
+model Equipe {
+  id           Int     @id @default(autoincrement())
+  nom          String
+  description  String? @db.Text
+  chefEquipeId Int
+  projetId     Int?
+
+  chefEquipe Utilisateur     @relation("ChefEquipe", fields: [chefEquipeId], references: [id])
+  projet     Projet?         @relation(fields: [projetId], references: [id])
+  membres    MembreEquipe[]
+
+  @@map("equipes")
+}
+
+model MembreEquipe {
+  id            Int @id @default(autoincrement())
+  equipeId      Int
+  utilisateurId Int
+
+  equipe      Equipe      @relation(fields: [equipeId], references: [id], onDelete: Cascade)
+  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+
+  @@unique([equipeId, utilisateurId])
+  @@map("membres_equipe")
+}
+
+model Rapport {
+  id            Int         @id @default(autoincrement())
+  tacheId       Int
+  chefEquipeId  Int
+  titre         String
+  description   String      @db.Text
+  statutTache   StatutTache
+  avancement    Int
+  observations  String?     @db.Text
+  photos        String?     @db.Text
+  dateCreation  DateTime    @default(now())
+
+  tache      Tache       @relation(fields: [tacheId], references: [id], onDelete: Cascade)
+  chefEquipe Utilisateur @relation("ChefEquipeRapport", fields: [chefEquipeId], references: [id])
+
+  @@map("rapports")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Assistant IA — base de connaissances vectorielle
+// Chaque ligne = un extrait de texte (projet, tâche, rapport...)
+// avec son embedding, utilisé pour la recherche sémantique (RAG).
+// ─────────────────────────────────────────────────────────────
+model AssistantDocument {
+  id         Int      @id @default(autoincrement())
+  type       String   // "projet" | "tache" | "equipe" | "rapport" | "inspection" | "utilisateur"
+  refId      Int      // id de la ligne source dans sa table d'origine
+  projetId   Int?     // portée d'accès : null = visible par tous les rôles authentifiés
+  content    String   @db.Text   // texte généré à partir des données, utilisé pour l'embedding
+  embedding  Json     // vecteur d'embedding (tableau de nombres flottants)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([type, refId])
+  @@index([projetId])
+  @@map("assistant_documents")
+}
+
+model Inspection {
+  id              Int              @id @default(autoincrement())
+  projetId        Int
+  inspecteurId    Int
+  dateInspection  DateTime
+  observations    String?          @db.Text
+  recommandations String?          @db.Text
+  statut          StatutInspection @default(EN_ATTENTE)
+  conforme        Boolean?
+
+  projet     Projet      @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  inspecteur Utilisateur @relation("Inspecteur", fields: [inspecteurId], references: [id])
+
+  @@map("inspections")
+}
